@@ -33,7 +33,8 @@ class TransformerBlock(nn.Module):
             dropout_rate=0.1,
             attention_dropout_rate=0.1,
             deterministic=False,
-            cache=None):
+            cache=None,
+            attention_fn=None):
     """Applies TransformerBlock module.
 
     Args:
@@ -55,6 +56,9 @@ class TransformerBlock(nn.Module):
 
     """
 
+    if attention_fn is None:
+      attention_fn = nn.attention.dot_product_attention
+
     # Attention block.
     assert inputs.ndim == 3
     x = nn.LayerNorm(inputs)
@@ -73,7 +77,8 @@ class TransformerBlock(nn.Module):
         broadcast_dropout=False,
         dropout_rate=attention_dropout_rate,
         deterministic=deterministic,
-        cache=cache)
+        cache=cache,
+        attention_fn=attention_fn)
     x = nn.dropout(x, rate=dropout_rate, deterministic=deterministic)
     x = x + inputs
 
@@ -113,7 +118,8 @@ class TransformerEncoder(nn.Module):
             classifier=False,
             classifier_pool='CLS',
             num_classes=10,
-            tied_weights=False):
+            tied_weights=False,
+            attention_fn=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -193,6 +199,7 @@ class TransformerEncoder(nn.Module):
           inputs_segmentation=inputs_segmentation,
           dropout_rate=dropout_rate,
           attention_dropout_rate=attention_dropout_rate,
+          attention_fn=attention_fn,
           deterministic=not train,
           name='encoderblock')
       for _ in range(num_layers):
@@ -209,6 +216,7 @@ class TransformerEncoder(nn.Module):
             inputs_segmentation=inputs_segmentation,
             dropout_rate=dropout_rate,
             attention_dropout_rate=attention_dropout_rate,
+            attention_fn=attention_fn,
             deterministic=not train,
             name=f'encoderblock_{lyr}')
 
@@ -241,6 +249,7 @@ class TransformerDualEncoder(nn.Module):
             train=False,
             dropout_rate=0.1,
             attention_dropout_rate=0.1,
+            attention_fn=None,
             classifier=True,
             classifier_pool='CLS',
             num_classes=2,
@@ -290,6 +299,7 @@ class TransformerDualEncoder(nn.Module):
         train=train,
         dropout_rate=dropout_rate,
         attention_dropout_rate=attention_dropout_rate,
+        attention_fn=attention_fn,
         name='encoder')
     inputs1_encoded = encoder(
         inputs=inputs1,

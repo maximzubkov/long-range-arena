@@ -187,6 +187,9 @@ def main(argv):
       'num_classes': 10
   })
 
+  if hasattr(config, 'attention_fn'):
+      model_kwargs['attention_fn'] = config.attention_fn
+
   rng = random.PRNGKey(random_seed)
   rng = jax.random.fold_in(rng, jax.host_id())
   rng, init_rng = random.split(rng)
