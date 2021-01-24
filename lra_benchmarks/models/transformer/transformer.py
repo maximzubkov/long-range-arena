@@ -16,6 +16,7 @@
 from flax import nn
 import jax.numpy as jnp
 from lra_benchmarks.models.layers import common_layers
+from lra_benchmarks.models.layers import attention
 
 
 class TransformerBlock(nn.Module):
@@ -34,7 +35,8 @@ class TransformerBlock(nn.Module):
             attention_dropout_rate=0.1,
             deterministic=False,
             cache=None,
-            attention_fn=None):
+            attention_fn=None,
+            qk_transform_fn=None):
     """Applies TransformerBlock module.
 
     Args:
@@ -50,6 +52,7 @@ class TransformerBlock(nn.Module):
       attention_dropout_rate: dropout rate for attention weights
       deterministic: bool, deterministic or not (to apply dropout)
       cache: flax autoregressive cache for fast decoding.
+      qk_transform_fn: A function used to transform queries and keys.
 
     Returns:
       output after transformer block.
@@ -62,7 +65,7 @@ class TransformerBlock(nn.Module):
     # Attention block.
     assert inputs.ndim == 3
     x = nn.LayerNorm(inputs)
-    x = nn.SelfAttention(
+    x = attention.SelfAttention(
         x,
         num_heads=num_heads,
         dtype=dtype,
@@ -78,7 +81,8 @@ class TransformerBlock(nn.Module):
         dropout_rate=attention_dropout_rate,
         deterministic=deterministic,
         cache=cache,
-        attention_fn=attention_fn)
+        attention_fn=attention_fn,
+        qk_transform_fn=qk_transform_fn)
     x = nn.dropout(x, rate=dropout_rate, deterministic=deterministic)
     x = x + inputs
 
@@ -119,7 +123,9 @@ class TransformerEncoder(nn.Module):
             classifier_pool='CLS',
             num_classes=10,
             tied_weights=False,
-            attention_fn=None):
+            attention_fn=None,
+            add_pos_emb=True,
+            qk_transform_fn=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -145,6 +151,8 @@ class TransformerEncoder(nn.Module):
       classifier_pool: str, supports "MEAN", "MAX" pooling.
       num_classes: int, number of classification classes.
       tied_weights: bool, to tie weights or not.
+      add_pos_emb: bool, whether to add positional embedding.
+      qk_transform_fn: A function used to transform queries and keys.
 
     Returns:
       output of a transformer encoder or logits if classifier_mode is true.
@@ -173,13 +181,14 @@ class TransformerEncoder(nn.Module):
       src_padding_mask = jnp.concatenate(
           [src_padding_mask[:, :1], src_padding_mask], axis=1)
 
-    pe_init = nn.initializers.normal(stddev=0.02) if learn_pos_emb else None
-    x = common_layers.AddPositionEmbs(
-        x,
-        inputs_positions=inputs_positions,
-        posemb_init=pe_init,
-        max_len=max_len,
-        name='posembed_input')
+    if add_pos_emb:
+      pe_init = nn.initializers.normal(stddev=0.02) if learn_pos_emb else None
+      x = common_layers.AddPositionEmbs(
+          x,
+          inputs_positions=inputs_positions,
+          posemb_init=pe_init,
+          max_len=max_len,
+          name='posembed_input')
     x = nn.dropout(x, rate=dropout_rate, deterministic=not train)
 
     if use_bfloat16:
@@ -200,6 +209,7 @@ class TransformerEncoder(nn.Module):
           dropout_rate=dropout_rate,
           attention_dropout_rate=attention_dropout_rate,
           attention_fn=attention_fn,
+          qk_transform_fn=qk_transform_fn,
           deterministic=not train,
           name='encoderblock')
       for _ in range(num_layers):
@@ -217,6 +227,7 @@ class TransformerEncoder(nn.Module):
             dropout_rate=dropout_rate,
             attention_dropout_rate=attention_dropout_rate,
             attention_fn=attention_fn,
+            qk_transform_fn=qk_transform_fn,
             deterministic=not train,
             name=f'encoderblock_{lyr}')
 
