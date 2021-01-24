@@ -18,12 +18,12 @@ from collections.abc import Iterable  # pylint: disable=g-importing-member
 
 import warnings
 
-from .. import jax_utils
-from . import base
-from . import initializers
-from . import stochastic
 
 from flax import struct
+from flax import jax_utils
+from flax.nn import base
+from flax.nn import initializers
+from flax.nn import stochastic
 from flax.nn.linear import default_kernel_init
 from flax.nn.linear import DenseGeneral
 from flax.nn.attention import dot_product_attention
@@ -142,7 +142,8 @@ class MultiHeadDotProductAttention(base.Module):
                          dense(inputs_kv, dtype=dtype, name='value'))
 
     # Apply key/query transform
-    query, key = qk_transform_fn(query, key)
+    if qk_transform_fn is not None:
+      query, key = qk_transform_fn(query, key)
 
     if cache:
       assert isinstance(cache, Cache), 'cache must be an instance of Cache'
