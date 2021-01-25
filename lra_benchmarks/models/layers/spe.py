@@ -12,7 +12,6 @@ def make_spe_transform_fn(spe_cls, spe_kwargs, gated=True, shared=False):
     else:
         spe_encoder = spe_cls.partial(**spe_kwargs)
 
-    @jax.jit
     def transform_fn(queries, keys):
         rng_seed = lax.convert_element_type(
           jnp.ceil(jnp.sum(queries) * 10000000.0), jnp.int32)
