@@ -17,6 +17,7 @@ import functools
 import itertools
 import json
 import os
+import pprint
 import time
 
 from absl import app
@@ -175,7 +176,9 @@ def main(argv):
   train_iter = iter(train_ds)
   input_shape = (batch_size, max_length)
 
-  model_kwargs = {
+  model_kwargs = (
+      config.model_kwargs.to_dict() if 'model_kwargs' in config else {})
+  model_kwargs.update({
       'vocab_size': vocab_size,
       'emb_dim': config.emb_dim,
       'num_heads': config.num_heads,
@@ -186,7 +189,7 @@ def main(argv):
       'classifier': True,
       'num_classes': 2,
       'classifier_pool': config.pooling_mode
-  }
+  })
 
   if hasattr(config, 'attention_fn'):
       model_kwargs['attention_fn'] = config.attention_fn
@@ -203,6 +206,13 @@ def main(argv):
                          input_shape, input_shape, model_kwargs)
   else:
     raise ValueError('Model type not supported.')
+
+  logging.info('Parameter shapes:\n%s',
+               pprint.pformat(jax.tree_map(lambda p: p.shape, model.params)))
+  logging.info('Total parameters: %d',
+               jax.tree_util.tree_reduce(
+                   lambda s, p: s + int(p.size),
+                   model.params, 0))
 
   optimizer = create_optimizer(
       model, learning_rate, weight_decay=FLAGS.config.weight_decay)

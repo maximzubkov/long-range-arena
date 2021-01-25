@@ -17,6 +17,7 @@ import functools
 import itertools
 import json
 import os
+import pprint
 import time
 
 from absl import app
@@ -205,6 +206,13 @@ def main(argv):
                          model_kwargs)
   else:
     raise ValueError('Model type not supported')
+
+  logging.info('Parameter shapes:\n%s',
+               pprint.pformat(jax.tree_map(lambda p: p.shape, model.params)))
+  logging.info('Total parameters: %d',
+               jax.tree_util.tree_reduce(
+                   lambda s, p: s + int(p.size),
+                   model.params, 0))
 
   optimizer = create_optimizer(model, learning_rate)
   del model  # Don't keep a copy of the initial model.

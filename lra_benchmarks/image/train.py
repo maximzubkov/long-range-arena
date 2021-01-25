@@ -17,6 +17,7 @@ import functools
 import itertools
 import json
 import os
+import pprint
 import time
 
 from absl import app
@@ -367,6 +368,13 @@ def main(argv):
   dropout_rngs = random.split(rng, jax.local_device_count())
 
   model, state = get_model(init_rng, input_shape, model_type, model_kwargs)
+
+  logging.info('Parameter shapes:\n%s',
+               pprint.pformat(jax.tree_map(lambda p: p.shape, model.params)))
+  logging.info('Total parameters: %d',
+               jax.tree_util.tree_reduce(
+                   lambda s, p: s + int(p.size),
+                   model.params, 0))
 
   optimizer = create_optimizer(model, learning_rate, config.weight_decay)
   del model  # Don't keep a copy of the initial model.
