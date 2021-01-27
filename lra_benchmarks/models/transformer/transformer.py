@@ -125,7 +125,8 @@ class TransformerEncoder(nn.Module):
             tied_weights=False,
             attention_fn=None,
             add_pos_emb=True,
-            qk_transform_fn=None):
+            qk_transform_fn=None,
+            qk_transform_fn_factory=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -153,6 +154,9 @@ class TransformerEncoder(nn.Module):
       tied_weights: bool, to tie weights or not.
       add_pos_emb: bool, whether to add positional embedding.
       qk_transform_fn: A function used to transform queries and keys.
+      qk_transform_fn_factory: A function returning a function used to
+        transform queries and keys. Use instead of `qk_transform_fn` if
+        you need to create shared modules.
 
     Returns:
       output of a transformer encoder or logits if classifier_mode is true.
@@ -190,6 +194,9 @@ class TransformerEncoder(nn.Module):
           max_len=max_len,
           name='posembed_input')
     x = nn.dropout(x, rate=dropout_rate, deterministic=not train)
+
+    if qk_transform_fn_factory is not None:
+      qk_transform_fn = qk_transform_fn_factory()
 
     if use_bfloat16:
       x = x.astype(jnp.bfloat16)
@@ -261,6 +268,9 @@ class TransformerDualEncoder(nn.Module):
             dropout_rate=0.1,
             attention_dropout_rate=0.1,
             attention_fn=None,
+            add_pos_emb=True,
+            qk_transform_fn=None,
+            qk_transform_fn_factory=None,
             classifier=True,
             classifier_pool='CLS',
             num_classes=2,
@@ -293,6 +303,11 @@ class TransformerDualEncoder(nn.Module):
       classifier_pool: str, supports "MEAN", "MAX" pooling.
       num_classes: int, number of classification classes.
       interaction: str, supports "NLI"
+      add_pos_emb: bool, whether to add positional embedding.
+      qk_transform_fn: A function used to transform queries and keys.
+      qk_transform_fn_factory: A function returning a function used to
+        transform queries and keys. Use instead of `qk_transform_fn` if
+        you need to create shared modules.
 
     Returns:
       output of a transformer decoder.
@@ -311,6 +326,9 @@ class TransformerDualEncoder(nn.Module):
         dropout_rate=dropout_rate,
         attention_dropout_rate=attention_dropout_rate,
         attention_fn=attention_fn,
+        add_pos_emb=add_pos_emb,
+        qk_transform_fn=qk_transform_fn,
+        qk_transform_fn_factory=qk_transform_fn_factory,
         name='encoder')
     inputs1_encoded = encoder(
         inputs=inputs1,

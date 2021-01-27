@@ -8,7 +8,7 @@ def make_spe_transform_fn(spe_cls, spe_kwargs, gated=True, shared=False):
     """Returns a function that applies the given SPE to keys and queries."""
 
     if shared:
-        spe_encoder = spe_cls.shared(**spe_kwargs)
+        spe_encoder = spe_cls.shared(**spe_kwargs, name='spe')
     else:
         spe_encoder = spe_cls.partial(**spe_kwargs)
 
