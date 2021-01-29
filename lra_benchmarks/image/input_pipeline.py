@@ -14,12 +14,15 @@
 
 """Functions to get dataset pipeline for the image cls tasks."""
 
+import os
+
 from lra_benchmarks.data import pathfinder
 import tensorflow.compat.v1 as tf
 import tensorflow_datasets as tfds
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
+_PATHFINER_TFDS_PATH = os.environ.get('PATHFINDER_TFDS_PATH')
 
 
 def get_mnist_datasets(n_devices, batch_size=256, normalize=False):
