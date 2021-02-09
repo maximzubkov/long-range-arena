@@ -48,6 +48,9 @@ flags.DEFINE_string(
 flags.DEFINE_string('task_name', default='mnist', help='Name of the task')
 flags.DEFINE_bool(
     'eval_only', default=False, help='Run the evaluation on the test data.')
+flags.DEFINE_string(
+    'results', default=None,
+    help='Name of the JSON file to store the results.')
 
 
 def create_model(key, flax_module, input_shape, model_kwargs):
@@ -199,7 +202,7 @@ def test(optimizer, state, p_eval_step, step, test_ds, summary_writer, model_dir
       summary_writer.scalar(f'test_{key}', val, step)
     summary_writer.flush()
   with tf.io.gfile.GFile(
-      os.path.join(model_dir, 'results.json'), 'w') as f:
+      FLAGS.results or os.path.join(model_dir, 'results.json'), 'w') as f:
     json.dump(jax.tree_map(lambda x: x.tolist(), test_summary), f)
 
 

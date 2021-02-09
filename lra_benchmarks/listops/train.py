@@ -54,6 +54,9 @@ flags.DEFINE_string(
     'data_dir', default=None, help='Directory containing datasets.')
 flags.DEFINE_bool(
     'test_only', default=False, help='Run the evaluation on the test data.')
+flags.DEFINE_string(
+    'results', default=None,
+    help='Name of the JSON file to store the results.')
 
 
 def create_model(key, flax_module, input_shape, model_kwargs):
@@ -261,7 +264,8 @@ def main(argv):
 
   if FLAGS.test_only:
     with tf.io.gfile.GFile(
-        os.path.join(FLAGS.model_dir, 'results.json'), 'w') as f:
+        FLAGS.results
+        or os.path.join(FLAGS.model_dir, 'results.json'), 'w') as f:
       test_summary = run_eval(test_ds)
       json.dump(jax.tree_map(lambda x: x.tolist(), test_summary), f)
     return
