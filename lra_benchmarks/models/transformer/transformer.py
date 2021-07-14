@@ -36,7 +36,8 @@ class TransformerBlock(nn.Module):
             deterministic=False,
             cache=None,
             attention_fn=None,
-            qk_transform_fn=None):
+            qk_transform_fn=None,
+            pos_bias_cfg=None):
     """Applies TransformerBlock module.
 
     Args:
@@ -53,6 +54,7 @@ class TransformerBlock(nn.Module):
       deterministic: bool, deterministic or not (to apply dropout)
       cache: flax autoregressive cache for fast decoding.
       qk_transform_fn: A function used to transform queries and keys.
+      pos_bias_cfg: dict or None, config for positional bias
 
     Returns:
       output after transformer block.
@@ -82,7 +84,8 @@ class TransformerBlock(nn.Module):
         deterministic=deterministic,
         cache=cache,
         attention_fn=attention_fn,
-        qk_transform_fn=qk_transform_fn)
+        qk_transform_fn=qk_transform_fn,
+        pos_bias_cfg=pos_bias_cfg)
     x = nn.dropout(x, rate=dropout_rate, deterministic=deterministic)
     x = x + inputs
 
@@ -126,7 +129,8 @@ class TransformerEncoder(nn.Module):
             attention_fn=None,
             add_pos_emb=True,
             qk_transform_fn=None,
-            qk_transform_fn_factory=None):
+            qk_transform_fn_factory=None,
+            pos_bias_cfg=None):
     """Applies Transformer model on the inputs.
 
     Args:
@@ -157,6 +161,7 @@ class TransformerEncoder(nn.Module):
       qk_transform_fn_factory: A function returning a function used to
         transform queries and keys. Use instead of `qk_transform_fn` if
         you need to create shared modules.
+      pos_bias_cfg: dict or None, config for positional bias
 
     Returns:
       output of a transformer encoder or logits if classifier_mode is true.
@@ -236,7 +241,8 @@ class TransformerEncoder(nn.Module):
             attention_fn=attention_fn,
             qk_transform_fn=qk_transform_fn,
             deterministic=not train,
-            name=f'encoderblock_{lyr}')
+            name=f'encoderblock_{lyr}',
+            pos_bias_cfg=pos_bias_cfg)
 
     encoded = nn.LayerNorm(x, dtype=dtype, name='encoder_norm')
 
@@ -274,7 +280,8 @@ class TransformerDualEncoder(nn.Module):
             classifier=True,
             classifier_pool='CLS',
             num_classes=2,
-            interaction=None):
+            interaction=None,
+            pos_bias_cfg=None):
     """Applies Transformer model on text similarity.
 
     A deliberate choice to distinguish this from NLI because
@@ -308,6 +315,7 @@ class TransformerDualEncoder(nn.Module):
       qk_transform_fn_factory: A function returning a function used to
         transform queries and keys. Use instead of `qk_transform_fn` if
         you need to create shared modules.
+      pos_bias_cfg: dict or None, config for positional bias
 
     Returns:
       output of a transformer decoder.
@@ -329,7 +337,8 @@ class TransformerDualEncoder(nn.Module):
         add_pos_emb=add_pos_emb,
         qk_transform_fn=qk_transform_fn,
         qk_transform_fn_factory=qk_transform_fn_factory,
-        name='encoder')
+        name='encoder',
+        pos_bias_cfg=pos_bias_cfg)
     inputs1_encoded = encoder(
         inputs=inputs1,
         inputs_positions=inputs1_positions,
