@@ -29,6 +29,7 @@ from flax.nn.linear import DenseGeneral
 from flax.nn.attention import dot_product_attention
 from flax.nn.attention import Cache
 from flax.nn.attention import _CacheEntry
+from positional_bias.jax import name2model
 import jax
 from jax import lax
 from jax import random
@@ -62,7 +63,8 @@ class MultiHeadDotProductAttention(base.Module):
             bias_init=initializers.zeros,
             bias=True,
             attention_fn=dot_product_attention,
-            qk_transform_fn=None):
+            qk_transform_fn=None,
+            pos_bias_cfg=None):
     """Applies multi-head dot product attention on the input data.
 
     Projects the inputs into multi-headed query, key, and value vectors,
@@ -107,6 +109,7 @@ class MultiHeadDotProductAttention(base.Module):
         `[bs, dim1, dim2, ..., dimN,, num_heads, value_channels]``
       qk_transform_fn: A function used to transform queries and keys
         after the projection.
+      pos_bias_cfg: dict or None, config for positional bias
 
     Returns:
       output of shape `[bs, dim1, dim2, ..., dimN, features]`.
@@ -247,6 +250,10 @@ class MultiHeadDotProductAttention(base.Module):
         dropout_rate=dropout_rate,
         broadcast_dropout=broadcast_dropout,
         deterministic=deterministic)
+
+    if pos_bias_cfg is not None:
+        pbv, z_pb = name2model[pos_bias_cfg["pos_bias_type"]](value, **pos_bias_cfg)
+        x = pbv + x
 
     # back to the original inputs dimensions
     out = DenseGeneral(
