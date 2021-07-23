@@ -252,7 +252,7 @@ class MultiHeadDotProductAttention(base.Module):
         deterministic=deterministic)
 
     if pos_bias_cfg is not None:
-        pbv, z_pb = name2model[pos_bias_cfg["pos_bias_type"]](value, **pos_bias_cfg)
+        pbv = name2model[pos_bias_cfg["pos_bias_type"]](value, **pos_bias_cfg)
         x = pbv + x
 
     # back to the original inputs dimensions
