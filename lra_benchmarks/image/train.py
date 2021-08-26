@@ -340,7 +340,8 @@ def main(argv):
        batch_size=batch_size,
        normalize=normalize)
   train_iter = iter(train_ds)
-  model_kwargs = {}
+  model_kwargs = (
+      config.model_kwargs.to_dict() if 'model_kwargs' in config else {})
   flatten_input = True
 
   if model_type in ['wideresnet', 'resnet', 'simple_cnn']:
