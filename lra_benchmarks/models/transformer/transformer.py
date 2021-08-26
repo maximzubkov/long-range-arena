@@ -223,7 +223,8 @@ class TransformerEncoder(nn.Module):
           attention_fn=attention_fn,
           qk_transform_fn=qk_transform_fn,
           deterministic=not train,
-          name='encoderblock')
+          name='encoderblock',
+          pos_bias_cfg=pos_bias_cfg)
       for _ in range(num_layers):
         x = encoder(x)
     else:
