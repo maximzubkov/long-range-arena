@@ -105,9 +105,7 @@ def train_step(optimizer, batch, dropout_rng=None):
     mean_loss = loss / weight_sum
     return mean_loss, logits
 
-  step = optimizer.state.step
-  value_fn = jax.value(loss_fn, has_aux=True)
-  _, logits = value_fn(optimizer.target)
+  _, logits = loss_fn(optimizer.target)
 
   return logits
 
