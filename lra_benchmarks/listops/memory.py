@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import exists, join
 
 from absl import app
 from absl import flags
@@ -164,6 +165,11 @@ def main(argv):
   if hasattr(config, 'attention_fn'):
       model_kwargs['attention_fn'] = config.attention_fn
 
+  tensorboard_dir = join(FLAGS.model_dir, "memory")
+  if not exists(tensorboard_dir):
+    os.mkdir(tensorboard_dir)
+  jax.profiler.start_trace(tensorboard_dir)
+
   rng = random.PRNGKey(random_seed)
   rng = jax.random.fold_in(rng, jax.host_id())
   rng, init_rng = random.split(rng)
@@ -179,7 +185,6 @@ def main(argv):
 
   optimizer = create_optimizer(model, learning_rate)
   del model  # Don't keep a copy of the initial model.
-  start_step = 0
 
   # Replicate optimizer.
   optimizer = jax_utils.replicate(optimizer)
@@ -190,9 +195,11 @@ def main(argv):
       functools.partial(train_step, learning_rate_fn=learning_rate_fn),
       axis_name='batch')
 
-  for step, batch in zip(range(start_step, num_train_steps), train_iter):
-    batch = common_utils.shard(jax.tree_map(lambda x: x._numpy(), batch))  # pylint: disable=protected-access
-    _ = p_train_step(optimizer, batch, dropout_rng=dropout_rngs)
+  batch = next(train_iter)
+  batch = common_utils.shard(jax.tree_map(lambda x: x._numpy(), batch))  # pylint: disable=protected-access
+  out = p_train_step(optimizer, batch, dropout_rng=dropout_rngs)
+  out.block_until_ready()
+  jax.profiler.stop_trace()
 
 
 if __name__ == '__main__':
