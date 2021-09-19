@@ -86,27 +86,10 @@ def create_optimizer(model, learning_rate):
   return optimizer
 
 
-def train_step(optimizer, batch, dropout_rng=None):
-  """Perform a single training step."""
-  train_keys = ['inputs', 'targets']
-  (inputs, targets) = [batch.get(k, None) for k in train_keys]
-
-  # We handle PRNG splitting inside the top pmap, rather
-  # than handling it outside in the training loop - doing the
-  # latter can add some stalls to the devices.
-  dropout_rng, new_dropout_rng = random.split(dropout_rng)
-
-  def loss_fn(model):
-    """Loss function used for training."""
-    with nn.stochastic(dropout_rng):
-      logits = model(inputs, train=True)
-    loss, weight_sum = train_utils.compute_weighted_cross_entropy(
-      logits, targets, num_classes=10, weights=None)
-    mean_loss = loss / weight_sum
-    return mean_loss, logits
-
-  _, logits = loss_fn(optimizer.target)
-
+def eval_step(model, batch):
+  eval_keys = ['inputs', 'targets']
+  (inputs, targets) = [batch.get(k, None) for k in eval_keys]
+  logits = model(inputs, train=False)
   return logits
 
 
@@ -125,7 +108,6 @@ def main(argv):
   config = FLAGS.config
   batch_size = config.batch_size
   learning_rate = config.learning_rate
-  num_train_steps = config.num_train_steps
 
   random_seed = config.random_seed
   model_type = config.model_type
@@ -135,7 +117,7 @@ def main(argv):
   if batch_size % jax.device_count() > 0:
     raise ValueError('Batch size must be divisible by the number of devices')
 
-  train_ds, _, _, encoder = input_pipeline.get_datasets(
+  _, eval_ds, _, encoder  = input_pipeline.get_datasets(
       n_devices=jax.local_device_count(),
       task_name=FLAGS.task_name,
       data_dir=FLAGS.data_dir,
@@ -143,8 +125,6 @@ def main(argv):
       max_length=config.max_length)
 
   vocab_size = encoder.vocab_size
-  train_ds = train_ds.repeat()
-  train_iter = iter(train_ds)
   max_length = config.max_length
   input_shape = (batch_size, max_length)
 
@@ -171,13 +151,9 @@ def main(argv):
   rng = random.PRNGKey(random_seed)
   rng = jax.random.fold_in(rng, jax.host_id())
   rng, init_rng = random.split(rng)
-  # We init the first set of dropout PRNG keys, but update it afterwards inside
-  # the main pmap'd training update for performance.
-  dropout_rngs = random.split(rng, jax.local_device_count())
 
   if model_type == 'transformer':
-    model = create_model(init_rng, transformer.TransformerEncoder, input_shape,
-                         model_kwargs)
+    model = create_model(init_rng, transformer.TransformerEncoder, input_shape, model_kwargs)
   else:
     raise ValueError('Model type not supported')
 
@@ -187,13 +163,23 @@ def main(argv):
   # Replicate optimizer.
   optimizer = jax_utils.replicate(optimizer)
 
-  p_train_step = jax.pmap(
-      functools.partial(train_step),
-      axis_name='batch')
+  p_eval_step = jax.pmap(eval_step, axis_name='batch')
 
-  batch = next(train_iter)
-  batch = common_utils.shard(jax.tree_map(lambda x: x._numpy(), batch))  # pylint: disable=protected-access
-  out = p_train_step(optimizer, batch, dropout_rng=dropout_rngs)
+  def run_eval(eval_ds, num_eval_steps=-1):
+    eval_iter = iter(eval_ds)
+    if num_eval_steps == -1:
+      num_iter = itertools.count()
+    else:
+      num_iter = range(num_eval_steps)
+    for _, eval_batch in zip(num_iter, eval_iter):
+      # pylint: disable=protected-access
+      eval_batch = common_utils.shard(
+          jax.tree_map(lambda x: x._numpy(), eval_batch))
+      # pylint: enable=protected-access
+      out = p_eval_step(optimizer.target, eval_batch)
+    return out
+
+  out = run_eval(eval_ds, 100)
   out.block_until_ready()
   jax.profiler.stop_trace()
 
