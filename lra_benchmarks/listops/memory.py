@@ -100,7 +100,10 @@ def train_step(optimizer, batch, learning_rate_fn, dropout_rng=None):
     """Loss function used for training."""
     with nn.stochastic(dropout_rng):
       logits = model(inputs, train=True)
-    return 0, logits
+    loss, weight_sum = train_utils.compute_weighted_cross_entropy(
+      logits, targets, num_classes=10, weights=None)
+    mean_loss = loss / weight_sum
+    return mean_loss, logits
 
   step = optimizer.state.step
   lr = learning_rate_fn(step)
