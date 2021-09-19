@@ -86,7 +86,7 @@ def create_optimizer(model, learning_rate):
   return optimizer
 
 
-def train_step(optimizer, batch, learning_rate_fn, dropout_rng=None):
+def train_step(optimizer, batch, dropout_rng=None):
   """Perform a single training step."""
   train_keys = ['inputs', 'targets']
   (inputs, targets) = [batch.get(k, None) for k in train_keys]
@@ -106,13 +106,10 @@ def train_step(optimizer, batch, learning_rate_fn, dropout_rng=None):
     return mean_loss, logits
 
   step = optimizer.state.step
-  lr = learning_rate_fn(step)
-  grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-  (_, logits), grad = grad_fn(optimizer.target)
-  grad = jax.lax.pmean(grad, 'batch')
-  new_optimizer = optimizer.apply_gradient(grad, learning_rate=lr)
+  value_fn = jax.value(loss_fn, has_aux=True)
+  _, logits = value_fn(optimizer.target)
 
-  return new_optimizer, new_dropout_rng
+  return logits
 
 
 def tohost(x):
@@ -192,10 +189,8 @@ def main(argv):
   # Replicate optimizer.
   optimizer = jax_utils.replicate(optimizer)
 
-  learning_rate_fn = train_utils.create_learning_rate_scheduler(
-      base_learning_rate=learning_rate)
   p_train_step = jax.pmap(
-      functools.partial(train_step, learning_rate_fn=learning_rate_fn),
+      functools.partial(train_step),
       axis_name='batch')
 
   batch = next(train_iter)
