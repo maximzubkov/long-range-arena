@@ -107,7 +107,6 @@ def main(argv):
     os.mkdir(tensorboard_dir)
   jax.profiler.start_trace(tensorboard_dir)
 
-
   train_ds, eval_ds, test_ds, encoder = input_pipeline.get_tc_datasets(
       n_devices=jax.local_device_count(),
       task_name=FLAGS.task_name,
@@ -172,6 +171,7 @@ def main(argv):
   out = run_eval(eval_ds, 1000)
   out.block_until_ready()
   jax.profiler.stop_trace()
+  jax.profiler.save_device_memory_profile(join(FLAGS.model_dir, "memory.prof"))
 
 if __name__ == '__main__':
   app.run(main)
