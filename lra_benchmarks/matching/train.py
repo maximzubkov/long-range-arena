@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import join, exists
 
 from absl import app
 from absl import flags
@@ -53,6 +54,9 @@ flags.DEFINE_string(
     'vocab_file_path',
     default='/tmp/lra_data/aan',
     help='Path for vocab file. Output of `build_vocab`.')
+flags.DEFINE_bool(
+    'profile', default=False,
+    help='Run profiler to measure memory consumption')
 flags.DEFINE_bool(
     'test_only', default=False, help='Run the evaluation on the test data.')
 flags.DEFINE_string(
@@ -140,6 +144,12 @@ def main(argv):
     raise app.UsageError('Too many command-line arguments.')
 
   tf.enable_v2_behavior()
+
+  if FLAGS.profile:
+    tensorboard_dir = join(FLAGS.model_dir, "memory")
+    if not exists(tensorboard_dir):
+        os.mkdir(tensorboard_dir)
+    jax.profiler.start_trace(tensorboard_dir)
 
   config = FLAGS.config
   logging.info('===========Config Dict============')
@@ -336,6 +346,9 @@ def main(argv):
         for key, val in test_summary.items():
           summary_writer.scalar(f'test_{key}', val, step)
         summary_writer.flush()
+
+  if FLAGS.profile:
+    jax.profiler.stop_trace()
 
 
 if __name__ == '__main__':
