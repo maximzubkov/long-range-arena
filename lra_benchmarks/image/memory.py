@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import exists, join
 
 from absl import app
 from absl import flags
@@ -364,51 +365,25 @@ def main(argv):
 
   model_kwargs.update(config.model)
 
+  tensorboard_dir = join(FLAGS.model_dir, "memory")
+  if not exists(tensorboard_dir):
+      os.mkdir(tensorboard_dir)
+  jax.profiler.start_trace(tensorboard_dir)
+
   rng = random.PRNGKey(random_seed)
   rng = jax.random.fold_in(rng, jax.host_id())
   rng, init_rng = random.split(rng)
   # We init the first set of dropout PRNG keys, but update it afterwards inside
   # the main pmap'd training update for performance.
-  dropout_rngs = random.split(rng, jax.local_device_count())
 
   model, state = get_model(init_rng, input_shape, model_type, model_kwargs)
-
-  logging.info('Parameter shapes:\n%s',
-               pprint.pformat(jax.tree_map(lambda p: p.shape, model.params)))
-  logging.info('Total parameters: %d',
-               jax.tree_util.tree_reduce(
-                   lambda s, p: s + int(p.size),
-                   model.params, 0))
 
   optimizer = create_optimizer(model, learning_rate, config.weight_decay)
   del model  # Don't keep a copy of the initial model.
 
-  start_step = 0
-  if config.restore_checkpoints:
-    # Restore unreplicated optimizer + model state from last checkpoint.
-    optimizer, state = checkpoints.restore_checkpoint(FLAGS.model_dir,
-                                                      (optimizer, state))
-    # Grab last step.
-    start_step = int(optimizer.state.step)
-
   # Replicate optimizer and state
   optimizer = jax_utils.replicate(optimizer)
   state = jax_utils.replicate(state)
-
-  learning_rate_fn = train_utils.create_learning_rate_scheduler(
-      factors=config.factors,
-      base_learning_rate=learning_rate,
-      warmup_steps=config.warmup,
-      steps_per_cycle=config.get('steps_per_cycle', None),
-  )
-  p_train_step = jax.pmap(
-      functools.partial(
-          train_step,
-          learning_rate_fn=learning_rate_fn,
-          num_classes=num_classes,
-          grad_clip_norm=config.get('grad_clip_norm', None),
-          flatten_input=flatten_input),
-      axis_name='batch')
 
   p_eval_step = jax.pmap(
       functools.partial(
@@ -416,17 +391,19 @@ def main(argv):
       axis_name='batch',
   )
 
-  optimizer, state, step = train_loop(config, dropout_rngs, eval_ds, eval_freq,
-                                      num_eval_steps, num_train_steps,
-                                      optimizer, state, p_eval_step,
-                                      p_train_step, start_step, train_iter,
-                                      summary_writer)
+  def run_eval(optimizer, state, p_eval_step, test_ds):
+      test_iter = iter(test_ds)
+      for _, test_batch in zip(itertools.repeat(1), test_iter):
+          # pylint: disable=protected-access
+          test_batch = common_utils.shard(
+              jax.tree_map(lambda x: x._numpy(), test_batch))
+          # pylint: enable=protected-access
+          out = p_eval_step(optimizer.target, state, test_batch)
+      return out
 
-  logging.info('Starting testing')
-  logging.info('====================')
-  test(optimizer, state, p_eval_step, step, test_ds, summary_writer,
-       FLAGS.model_dir)
-
+  out = run_eval(optimizer, state=state, p_eval_step=p_eval_step, test_ds=test_ds)
+  out.block_until_ready()
+  jax.profiler.stop_trace()
 
 if __name__ == '__main__':
   app.run(main)

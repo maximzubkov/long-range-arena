@@ -179,7 +179,7 @@ def main(argv):
       out = p_eval_step(optimizer.target, eval_batch)
     return out
 
-  out = run_eval(eval_ds, 100)
+  out = run_eval(eval_ds, 1000)
   out.block_until_ready()
   jax.profiler.stop_trace()
 
