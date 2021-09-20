@@ -15,30 +15,25 @@
 """Main training script for the image classification task."""
 import functools
 import itertools
-import json
 import os
-import pprint
-import time
 from os.path import exists, join
 
+import jax
+import jax.nn
+import jax.numpy as jnp
+import tensorflow.compat.v2 as tf
 from absl import app
 from absl import flags
 from absl import logging
 from flax import jax_utils
 from flax import nn
 from flax import optim
-from flax.metrics import tensorboard
-from flax.training import checkpoints
 from flax.training import common_utils
-import jax
 from jax import random
-import jax.nn
-import jax.numpy as jnp
+from ml_collections import config_flags
+
 from lra_benchmarks.image import task_registry
 from lra_benchmarks.models.transformer import transformer
-from lra_benchmarks.utils import train_utils
-from ml_collections import config_flags
-import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS
 
