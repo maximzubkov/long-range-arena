@@ -92,8 +92,6 @@ def main(argv):
   tf.enable_v2_behavior()
 
   config = FLAGS.config
-  logging.info('===========Config Dict============')
-  logging.info(config)
   batch_size = config.batch_size
   learning_rate = config.learning_rate
   random_seed = config.random_seed
@@ -103,6 +101,12 @@ def main(argv):
 
   if batch_size % jax.device_count() > 0:
     raise ValueError('Batch size must be divisible by the number of devices')
+
+  tensorboard_dir = join(FLAGS.model_dir, "memory")
+  if not exists(tensorboard_dir):
+    os.mkdir(tensorboard_dir)
+  jax.profiler.start_trace(tensorboard_dir)
+
 
   train_ds, eval_ds, test_ds, encoder = input_pipeline.get_tc_datasets(
       n_devices=jax.local_device_count(),
@@ -134,11 +138,6 @@ def main(argv):
   if hasattr(config, 'attention_fn'):
       model_kwargs['attention_fn'] = config.attention_fn
 
-  tensorboard_dir = join(FLAGS.model_dir, "memory")
-  if not exists(tensorboard_dir):
-    os.mkdir(tensorboard_dir)
-  jax.profiler.start_trace(tensorboard_dir)
-
   rng = random.PRNGKey(random_seed)
   rng = jax.random.fold_in(rng, jax.host_id())
   rng, init_rng = random.split(rng)
@@ -147,7 +146,6 @@ def main(argv):
     model = create_model(init_rng, transformer.TransformerEncoder, input_shape, model_kwargs)
   else:
     raise ValueError('Model type not supported')
-
 
   optimizer = create_optimizer(model, learning_rate, weight_decay=FLAGS.config.weight_decay)
   del model  # Don't keep a copy of the initial model.
