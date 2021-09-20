@@ -281,6 +281,8 @@ def main(argv):
         or os.path.join(FLAGS.model_dir, 'results.json'), 'w') as f:
       test_summary = run_eval(test_ds)
       json.dump(jax.tree_map(lambda x: x.tolist(), test_summary), f)
+    if FLAGS.profile:
+        jax.profiler.stop_trace()
     return
 
   metrics_all = []
@@ -346,9 +348,6 @@ def main(argv):
         for key, val in test_summary.items():
           summary_writer.scalar(f'test_{key}', val, step)
         summary_writer.flush()
-
-  if FLAGS.profile:
-    jax.profiler.stop_trace()
 
 
 if __name__ == '__main__':
