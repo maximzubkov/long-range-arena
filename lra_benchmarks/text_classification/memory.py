@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import join, exists
 
 from absl import app
 from absl import flags
@@ -137,6 +138,11 @@ def main(argv):
 
   if hasattr(config, 'attention_fn'):
       model_kwargs['attention_fn'] = config.attention_fn
+
+  tensorboard_dir = join(FLAGS.model_dir, "memory")
+  if not exists(tensorboard_dir):
+    os.mkdir(tensorboard_dir)
+  jax.profiler.start_trace(tensorboard_dir)
 
   rng = random.PRNGKey(random_seed)
   rng = jax.random.fold_in(rng, jax.host_id())
