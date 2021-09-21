@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import exists, join
 
 from absl import app
 from absl import flags
@@ -52,6 +53,9 @@ flags.DEFINE_string(
     help='Name of the task used for load training/test data.')
 flags.DEFINE_string(
     'data_dir', default=None, help='Directory containing datasets.')
+flags.DEFINE_bool(
+    'profile', default=False,
+    help='Run profiler to measure memory consumption')
 flags.DEFINE_bool(
     'test_only', default=False, help='Run the evaluation on the test data.')
 flags.DEFINE_string(
@@ -148,6 +152,12 @@ def main(argv):
     raise app.UsageError('Too many command-line arguments.')
 
   tf.enable_v2_behavior()
+
+  if FLAGS.profile:
+    tensorboard_dir = join(FLAGS.model_dir, "memory")
+    if not exists(tensorboard_dir):
+        os.mkdir(tensorboard_dir)
+    jax.profiler.start_trace(tensorboard_dir)
 
   config = FLAGS.config
   logging.info('===========Config Dict============')
@@ -268,6 +278,8 @@ def main(argv):
         or os.path.join(FLAGS.model_dir, 'results.json'), 'w') as f:
       test_summary = run_eval(test_ds)
       json.dump(jax.tree_map(lambda x: x.tolist(), test_summary), f)
+    if FLAGS.profile:
+        jax.profiler.stop_trace()
     return
 
   metrics_all = []

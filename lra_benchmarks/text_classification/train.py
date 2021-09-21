@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import join, exists
 
 from absl import app
 from absl import flags
@@ -56,6 +57,9 @@ flags.DEFINE_bool(
 flags.DEFINE_string(
     'results', default=None,
     help='Name of the JSON file to store the results.')
+flags.DEFINE_bool(
+    'profile', default=False,
+    help='Run profiler to measure memory consumption')
 
 CLASS_MAP = {'imdb_reviews': 2}
 
@@ -140,6 +144,12 @@ def main(argv):
     raise app.UsageError('Too many command-line arguments.')
 
   tf.enable_v2_behavior()
+
+  if FLAGS.profile:
+    tensorboard_dir = join(FLAGS.model_dir, "memory")
+    if not exists(tensorboard_dir):
+        os.mkdir(tensorboard_dir)
+    jax.profiler.start_trace(tensorboard_dir)
 
   config = FLAGS.config
   logging.info('===========Config Dict============')
@@ -269,6 +279,8 @@ def main(argv):
         or os.path.join(FLAGS.model_dir, 'results.json'), 'w') as f:
       test_summary = run_eval(test_ds)
       json.dump(jax.tree_map(lambda x: x.tolist(), test_summary), f)
+    if FLAGS.profile:
+        jax.profiler.stop_trace()
     return
 
   metrics_all = []

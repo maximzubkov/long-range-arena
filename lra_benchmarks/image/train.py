@@ -19,6 +19,7 @@ import json
 import os
 import pprint
 import time
+from os.path import join, exists
 
 from absl import app
 from absl import flags
@@ -46,6 +47,9 @@ config_flags.DEFINE_config_file(
 flags.DEFINE_string(
     'model_dir', default=None, help='Directory to store model data.')
 flags.DEFINE_string('task_name', default='mnist', help='Name of the task')
+flags.DEFINE_bool(
+    'profile', default=False,
+    help='Run profiler to measure memory consumption')
 flags.DEFINE_bool(
     'eval_only', default=False, help='Run the evaluation on the test data.')
 flags.DEFINE_string(
@@ -308,6 +312,12 @@ def main(argv):
 
   tf.enable_v2_behavior()
 
+  if FLAGS.profile:
+    tensorboard_dir = join(FLAGS.model_dir, "memory")
+    if not exists(tensorboard_dir):
+        os.mkdir(tensorboard_dir)
+    jax.profiler.start_trace(tensorboard_dir)
+
   config = FLAGS.config
   logging.info('===========Config Dict============')
   logging.info(config)
@@ -427,6 +437,8 @@ def main(argv):
   test(optimizer, state, p_eval_step, step, test_ds, summary_writer,
        FLAGS.model_dir)
 
+  if FLAGS.profile:
+    jax.profiler.stop_trace()
 
 if __name__ == '__main__':
   app.run(main)
