@@ -36,6 +36,8 @@ from jax import random
 import jax.numpy as jnp
 import numpy as onp
 
+from lra_benchmarks.models.layers.common_layers import Embed
+
 
 class MultiHeadDotProductAttention(base.Module):
   """Multi-head dot-product attention."""
@@ -252,8 +254,23 @@ class MultiHeadDotProductAttention(base.Module):
         deterministic=deterministic)
 
     if pos_bias_cfg is not None:
+      if pos_bias_cfg["pos_bias_type"] == "relative_key_query":
+        seq_length = pos_bias_cfg["max_seq_len"]
+        position_ids_l = jnp.arange(seq_length).view(-1, 1)
+        position_ids_r = jnp.arange(seq_length).view(1, -1)
+        distance = position_ids_l - position_ids_r
+        positional_embedding = Embed(
+          distance + seq_length - 1,
+          num_emeddings=2 * seq_length - 1,
+          features=qkv_features
+        )
+        relative_position_scores_query = jnp.einsum("blhd,lrd->bhlr", query, positional_embedding)
+        relative_position_scores_key = jnp.einsum("brhd,lrd->bhlr", key, positional_embedding)
+        rp = relative_position_scores_query + relative_position_scores_key
+        pbv = jnp.einsum("blhd,bhlr->brhd", value, rp)
+      else:
         pbv = name2model[pos_bias_cfg["pos_bias_type"]](value, **pos_bias_cfg)
-        x = pbv + x
+      x = pbv + x
 
     # back to the original inputs dimensions
     out = DenseGeneral(
