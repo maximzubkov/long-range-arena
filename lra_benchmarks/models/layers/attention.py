@@ -256,13 +256,13 @@ class MultiHeadDotProductAttention(base.Module):
     if pos_bias_cfg is not None:
       if pos_bias_cfg["pos_bias_type"] == "relative_key_query":
         seq_length = pos_bias_cfg["max_seq_len"]
-        position_ids_l = jnp.arange(seq_length).view(-1, 1)
-        position_ids_r = jnp.arange(seq_length).view(1, -1)
+        position_ids_l = jnp.reshape(jnp.arange(seq_length), (-1, 1))
+        position_ids_r = jnp.reshape(jnp.arange(seq_length), (1, -1))
         distance = position_ids_l - position_ids_r
         positional_embedding = Embed(
           distance + seq_length - 1,
           num_emeddings=2 * seq_length - 1,
-          features=qkv_features
+          features=head_dim
         )
         relative_position_scores_query = jnp.einsum("blhd,lrd->bhlr", query, positional_embedding)
         relative_position_scores_key = jnp.einsum("brhd,lrd->bhlr", key, positional_embedding)
