@@ -261,7 +261,7 @@ class MultiHeadDotProductAttention(base.Module):
         distance = position_ids_l - position_ids_r
         positional_embedding = Embed(
           distance + seq_length - 1,
-          num_emeddings=2 * seq_length - 1,
+          num_embeddings=2 * seq_length - 1,
           features=head_dim
         )
         relative_position_scores_query = jnp.einsum("blhd,lrd->bhlr", query, positional_embedding)
