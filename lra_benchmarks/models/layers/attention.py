@@ -253,8 +253,7 @@ class MultiHeadDotProductAttention(base.Module):
         relative_position_scores_query = jnp.einsum("blhd,lrd->bhlr", query, positional_embedding)
         relative_position_scores_key = jnp.einsum("brhd,lrd->bhlr", key, positional_embedding)
         rp = relative_position_scores_query + relative_position_scores_key
-        rpe = jnp.einsum("blhd,bhlr->brhd", value, rp)
-        attention_bias = attention_bias + rpe if attention_bias is not None else rpe
+        attention_bias = attention_bias + rp if attention_bias is not None else rp
 
     # apply attention
     x = attention_fn(
